@@ -89,6 +89,21 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'customerId and details are required' });
   }
 
+  // Ensure chosen customer exists to prevent P2003
+  const customerExists = await prisma.customer.findUnique({ where: { id: Number(customerId) } });
+  if (!customerExists) {
+    return res.status(400).json({ error: 'Invalid customerId: Customer does not exist' });
+  }
+
+  let resolvedStaffId = Number(staffId);
+  if (req.user.role === 'customer') {
+    const firstStaff = await prisma.staff.findFirst();
+    if (!firstStaff) {
+      return res.status(500).json({ error: 'No staff available to handle booking' });
+    }
+    resolvedStaffId = firstStaff.id;
+  }
+
   // Kiểm tra xem sân có available không
   for (const detail of details) {
     const conflictingBooking = await prisma.bookingDetail.findFirst({
@@ -114,8 +129,7 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
   const booking = await prisma.booking.create({
     data: {
       customerId: Number(customerId),
-      // Schema yêu cầu staffId (bắt buộc), nên nếu là Customer đặt thì gán cho NV mặc định (ID: 22)
-      staffId: req.user.role === 'customer' ? 22 : Number(staffId),
+      staffId: resolvedStaffId,
       deposit: Number(deposit || 0),
       details: {
         create: details.map(d => ({

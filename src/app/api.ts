@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://badminton-management-production-b2ba.up.railway.app/api';
+// Auto-detect API URL. In production, it runs on the same domain. In dev, it runs on localhost:3001.
+const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
