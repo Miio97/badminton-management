@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id        Int       @id @default(autoincrement()) @map("account_id")
+  username  String    @unique
+  password  String
+  role      String
+  status    String    @default("active") @map("trang_thai")
+  createdAt DateTime  @default(now()) @map("ngay_tao")
+  lastLogin DateTime? @map("lan_dang_nhap_cuoi")
+
+  customer Customer?
+  staff    Staff?
+}
+
+model Customer {
+  id       Int     @id @default(autoincrement()) @map("ma_khach_hang")
+  fullName String  @map("ho_ten")
+  phone    String? @map("sdt")
+  email    String?
+  points   Int     @default(0) @map("diem")
+
+  accountId Int?     @unique @map("account_id")
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  invoices     Invoice[]
+  bookings     Booking[]
+  pointHistory PointHistory[]
+}
+
+model Staff {
+  id       Int     @id @default(autoincrement()) @map("ma_nv")
+  fullName String  @map("ten_nv")
+  position String  @map("chuc_vu")
+  phone    String? @map("sdt")
+  email    String?
+  status   String  @default("active") @map("trang_thai")
+
+  accountId Int?     @unique @map("account_id")
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  salaryConfigId Int?          @map("ma_luong")
+  salaryConfig   SalaryConfig? @relation(fields: [salaryConfigId], references: [id])
+
+  invoices        Invoice[]
+  bookings        Booking[]
+  stockReceipts   StockReceipt[]
+  attendances     Attendance[]
+  bonusPenalties  BonusPenalty[]
+  monthlySalaries MonthlySalary[]
+}
+
+model CourtType {
+  id          Int    @id @default(autoincrement()) @map("ma_loai")
+  name        String @map("ten_loai")
+  hourlyPrice Float  @map("gia_gio")
+
+  courts Court[]
+}
+
+model Court {
+  id     Int     @id @default(autoincrement()) @map("ma_san")
+  name   String  @map("ten_san")
+  status String  @default("available") @map("trang_thai")
+  notes  String? @map("ghi_chu")
+
+  typeId Int       @map("ma_loai")
+  type   CourtType @relation(fields: [typeId], references: [id])
+
+  bookingDetails BookingDetail[]
+  invoiceDetails InvoiceDetail[]
+}
+
+model Product {
+  id     Int    @id @default(autoincrement()) @map("ma_sp")
+  name   String @map("ten_sp")
+  unit   String @map("dvt")
+  price  Float  @map("gia")
+  status String @default("active") @map("trang_thai")
+
+  invoiceDetails InvoiceDetail[]
+  receiptDetails StockReceiptDetail[]
+}
+
+model Promotion {
+  id         Int      @id @default(autoincrement()) @map("ma_km")
+  name       String   @map("ten_km")
+  notes      String?  @map("ghi_chu")
+  type       String   @map("loai_km")
+  value      Float    @map("gia_tri")
+  startDate  DateTime @map("ngay_bat_dau")
+  endDate    DateTime @map("ngay_ket_thuc")
+  conditions String?  @map("dieu_kien")
+  status     String   @default("active") @map("trang_thai")
+
+  invoices Invoice[]
+}
+
+model Booking {
+  id          Int      @id @default(autoincrement()) @map("ma_pds")
+  bookingDate DateTime @default(now()) @map("ngay_lap_phieu")
+  deposit     Float    @default(0) @map("tien_coc")
+
+  customerId Int      @map("ma_kh")
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+
+  invoices Invoice[]
+  details  BookingDetail[]
+}
+
+model BookingDetail {
+  bookingId Int      @map("ma_pds")
+  courtId   Int      @map("ma_san")
+  date      DateTime @map("ngay_dat")
+  startTime DateTime @map("gio_bat_dau")
+  endTime   DateTime @map("gio_ket_thuc")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  court   Court   @relation(fields: [courtId], references: [id])
+
+  @@id([bookingId, courtId])
+}
+
+model Invoice {
+  id            Int      @id @default(autoincrement()) @map("ma_hd")
+  paymentMethod String   @map("phuong_thuc_tt")
+  invoiceDate   DateTime @default(now()) @map("ngay_lap_hd")
+  timeCreated   DateTime @default(now()) @map("gio_lap")
+  totalAmount   Float    @map("tong_tien")
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+
+  customerId Int?      @map("ma_kh")
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  bookingId Int?     @map("ma_pds")
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+
+  promotionId Int?       @map("ma_km")
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+
+  details      InvoiceDetail[]
+  pointHistory PointHistory[]
+}
+
+model InvoiceDetail {
+  id        Int  @id @default(autoincrement()) @map("ma_cthd")
+  invoiceId Int  @map("ma_hd")
+  courtId   Int? @map("ma_san") // Can be null if only buying products
+  productId Int? @map("ma_sp") // Can be null if only paying for court
+
+  startTime   DateTime? @map("gio_bat_dau")
+  endTime     DateTime? @map("gio_ket_thuc")
+  amount      Float     @map("thanh_tien")
+  unitPrice   Float?    @map("don_gia")
+  hourlyPrice Float?    @map("don_gia_gio")
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  court   Court?   @relation(fields: [courtId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+model PointHistory {
+  id     Int    @id @default(autoincrement())
+  points Int    @map("so_diem")
+  method String @map("phuong_thuc")
+
+  customerId Int      @map("ma_kh")
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  invoiceId Int     @map("ma_hd")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model Supplier {
+  id      Int     @id @default(autoincrement()) @map("ma_ncc")
+  name    String  @map("ten_ncc")
+  phone   String? @map("sdt")
+  address String? @map("dia_chi")
+  email   String?
+  status  String  @default("active") @map("trang_thai")
+
+  receipts StockReceipt[]
+}
+
+model StockReceipt {
+  id    Int      @id @default(autoincrement()) @map("ma_phieu_nhap")
+  date  DateTime @default(now()) @map("ngay_nhap")
+  time  DateTime @default(now()) @map("thoi_gian_nhap")
+  notes String?  @map("ghi_chu")
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+
+  supplierId Int      @map("ma_ncc")
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  details StockReceiptDetail[]
+}
+
+model StockReceiptDetail {
+  receiptId Int    @map("ma_phieu_nhap")
+  productId Int    @map("ma_sp")
+  quantity  Int    @map("so_luong")
+  unitPrice Float  @map("don_gia")
+  unit      String @map("don_vi_tinh")
+
+  receipt StockReceipt @relation(fields: [receiptId], references: [id])
+  product Product      @relation(fields: [productId], references: [id])
+
+  @@id([receiptId, productId])
+}
+
+model SalaryConfig {
+  id         Int   @id @default(autoincrement()) @map("ma_luong")
+  baseSalary Float @map("luong_co_ban")
+  hourlyRate Float @map("luong_theo_gio")
+  allowance  Float @map("phu_cap")
+
+  staff Staff[]
+}
+
+model Attendance {
+  id          Int       @id @default(autoincrement()) @map("ma_cong")
+  timeIn      DateTime  @map("gio_vao")
+  timeOut     DateTime? @map("gio_ra")
+  hoursWorked Float?    @map("so_gio_lam")
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+}
+
+model BonusPenalty {
+  id     Int      @id @default(autoincrement()) @map("ma_tp")
+  date   DateTime @default(now()) @map("ngay")
+  type   String   @map("loai") // Bonus or Penalty
+  amount Float    @map("so_tien")
+  reason String?  @map("ly_do")
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+}
+
+model MonthlySalary {
+  id           Int    @id @default(autoincrement()) @map("ma_bang_luong")
+  monthYear    String @map("thang_nam")
+  totalHours   Float  @map("tong_gio")
+  mainSalary   Float  @map("luong_chinh")
+  bonusPenalty Float  @map("thuong_phat")
+
+  staffId Int   @map("ma_nv")
+  staff   Staff @relation(fields: [staffId], references: [id])
+}
+
+model Feedback {
+  id           Int      @id @default(autoincrement()) @map("ma_dg")
+  customerName String   @map("ten_kh")
+  rating       Int      @map("so_sao")
+  comment      String   @map("binh_luan")
+  date         DateTime @default(now()) @map("ngay_dg")
+  courtName    String?  @map("ten_san")
+  likes        Int      @default(0) @map("luot_thich")
+}
+
